@@ -2,7 +2,6 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
-  Navigate,
 } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
@@ -20,11 +19,13 @@ import StaffAttendance from "./pages/staff/StaffAttendance";
 import AdminDashboard from "./pages/dashboard/AdminDashboard";
 import StudentAttendance from "./pages/attendance/StudentAttendance";
 import Timetable from "./pages/academics/Timetable";
+import MarksEntry from './pages/examinations/MarksEntry';
+import AcademicsManagement from "./pages/academics/AcademicsManagement";
+import TeacherAssignments from "./pages/academics/TeacherAssignments";
 
-// Dummy imports for now (we will build these pages soon)
-const StaffDashboard = () => <div className="text-2xl">Staff Dashboard</div>;
+// Fallback / Dummy Pages
 const NotFound = () => (
-  <div className="text-2xl text-red-500">404 - Page Not Found</div>
+  <div className="text-2xl text-red-500 p-8">404 - Page Not Found</div>
 );
 
 function App() {
@@ -37,20 +38,29 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/kiosk" element={<AttendanceKiosk />} />
 
-          {/* Protected Routes inside the Main Layout */}
+          {/* Protected Routes inside Main Layout */}
           <Route element={<ProtectedRoute />}>
             <Route element={<LayoutWrapper />}>
-              {/* Universal routes (available to any logged-in user, UI changes based on role) */}
+              {/* Universal Routes */}
               <Route path="/dashboard" element={<AdminDashboard />} />
               <Route path="/students" element={<StudentList />} />
               <Route path="/students/add" element={<AddStudent />} />
               <Route path="/students/:id" element={<StudentProfile />} />
               
-              {/* Academics & Attendance Routes */}
+              {/* Academics & Allocations Routes */}
+              <Route path="/academics" element={<AcademicsManagement />} />
+              <Route path="/academics/teacher-assignments" element={<TeacherAssignments />} />
+              <Route path="/academics/class-teachers" element={<TeacherAssignments />} />
+              <Route path="/staff/assignments" element={<TeacherAssignments />} />
+              
+              {/* Attendance & Scheduling */}
               <Route path="/attendance" element={<StudentAttendance />} />
               <Route path="/timetable" element={<Timetable />} />
+              <Route path="/timetable/staff" element={<Timetable />} />
+              <Route path="/examinations" element={<MarksEntry />} />
+              <Route path="/examinations/marks" element={<MarksEntry />} />
 
-              {/* Admin & Manager Only Routes */}
+              {/* Admin & Manager Restricted Routes */}
               <Route
                 element={
                   <ProtectedRoute
@@ -64,7 +74,7 @@ function App() {
                 <Route path="/staff/attendance" element={<StaffAttendance />} />
               </Route>
 
-              {/* Admin & Student Manager Only Routes */}
+              {/* Admissions & Fees Restricted Routes */}
               <Route
                 element={
                   <ProtectedRoute
@@ -78,14 +88,14 @@ function App() {
               >
                 <Route
                   path="/admissions"
-                  element={<div>Student Admissions</div>}
+                  element={<div className="p-6">Student Admissions</div>}
                 />
-                <Route path="/fees" element={<div>Fee Management</div>} />
+                <Route path="/fees" element={<div className="p-6">Fee Management</div>} />
               </Route>
 
-              {/* Teacher/Staff Only Routes */}
+              {/* Staff Portal Routes */}
               <Route element={<ProtectedRoute allowedRoles={["STAFF"]} />}>
-                <Route path="/my-classes" element={<div>My Classes</div>} />
+                <Route path="/my-classes" element={<div className="p-6">My Classes</div>} />
                 <Route
                   path="/my-timetable"
                   element={<Timetable isStaffView={true} />}

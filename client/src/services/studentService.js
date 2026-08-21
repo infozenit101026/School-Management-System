@@ -7,5 +7,11 @@ export const studentService = {
       params: { academicYearId, sectionId }
     });
     return response.data;
+  },
+
+  registerAdmission: async (admissionPayload) => {
+    const response = await api.post('/students/admission', admissionPayload);
+    return response.data;
   }
+  
 };

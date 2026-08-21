@@ -2,7 +2,7 @@ import AcademicYear from '../models/AcademicYear.js';
 import Class from '../models/Class.js';
 import Section from '../models/Section.js';
 import Subject from '../models/Subject.js';
-
+import ClassTeacherAssignment from '../models/ClassTeacherAssignment.js';
 // --- ACADEMIC YEAR CONTROLLERS ---
 export const createAcademicYear = async (req, res, next) => {
   try {
@@ -87,6 +87,30 @@ export const getSubjects = async (req, res, next) => {
   try {
     const subjects = await Subject.find().sort({ name: 1 });
     res.status(200).json({ success: true, data: subjects });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const assignClassTeacher = async (req, res, next) => {
+  try {
+    const { staff, academicYear, classId, sectionId } = req.body;
+
+    // 1. Create or update Class Teacher Assignment record
+    const assignment = await ClassTeacherAssignment.findOneAndUpdate(
+      { academicYear, sectionId },
+      { staff, classId, assignedBy: req.user?._id },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    // 2. Sync staff reference with the Section schema
+    await Section.findByIdAndUpdate(sectionId, { classTeacher: staff });
+
+    res.status(200).json({
+      success: true,
+      message: 'Class teacher assigned successfully',
+      data: assignment
+    });
   } catch (error) {
     next(error);
   }

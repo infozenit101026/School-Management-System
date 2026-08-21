@@ -20,12 +20,10 @@ import {
 const Sidebar = () => {
   const { user } = useAuth();
 
-  // Master navigation configuration categorized by roles
   const getNavItems = () => {
     const role = user?.role;
-    const managerType = user?.managerType; // SCHOOL_MANAGER, STAFF_MANAGER, STUDENT_MANAGER
+    const managerType = user?.managerType;
 
-    // Base items accessible to all staff/admin users
     const items = [
       { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }
     ];
@@ -34,15 +32,16 @@ const Sidebar = () => {
       return [
         ...items,
         { label: 'System & Users', path: '/admin/users', icon: ShieldCheck },
-        { label: 'Academics', path: '/academics', icon: BookOpen },
+        { label: 'Academics Structure', path: '/academics', icon: BookOpen },
+        { label: 'Teacher Allocations', path: '/academics/teacher-assignments', icon: UserCheck },
         { label: 'Students', path: '/students', icon: GraduationCap },
         { label: 'Admissions', path: '/admissions', icon: UserCheck },
-        { label: 'Staff Management', path: '/staff', icon: Users },
-        { label: 'Attendance', path: '/staff/attendance', icon: CalendarCheck },
+        { label: 'Staff Directory', path: '/staff', icon: Users },
+        { label: 'Staff Attendance', path: '/staff/attendance', icon: CalendarCheck },
         { label: 'Examinations & Marks', path: '/examinations', icon: Award },
         { label: 'Fee Management', path: '/fees', icon: DollarSign },
         { label: 'Payroll', path: '/payroll', icon: DollarSign },
-        { label: 'Timetable', path: '/timetable', icon: Clock },
+        { label: 'Timetable Scheduler', path: '/timetable', icon: Clock },
         { label: 'Transport', path: '/transport', icon: Bus },
         { label: 'Events & Tours', path: '/events', icon: Calendar },
         { label: 'Reports', path: '/reports', icon: FileText },
@@ -55,8 +54,7 @@ const Sidebar = () => {
         return [
           ...items,
           { label: 'Academic Overview', path: '/academics', icon: BookOpen },
-          { label: 'Staff Assignments', path: '/staff/assignments', icon: Users },
-          { label: 'Class Teachers', path: '/academics/class-teachers', icon: UserCheck },
+          { label: 'Teacher Allocations', path: '/academics/teacher-assignments', icon: UserCheck },
           { label: 'Students', path: '/students', icon: GraduationCap },
           { label: 'Timetable', path: '/timetable', icon: Clock },
           { label: 'Attendance', path: '/attendance', icon: CalendarCheck },
@@ -103,7 +101,6 @@ const Sidebar = () => {
 
   return (
     <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen sticky top-0 border-r border-slate-800">
-      {/* App Branding */}
       <div className="h-16 flex items-center px-6 border-b border-slate-800 gap-3">
         <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-white text-lg">
           S
@@ -114,7 +111,6 @@ const Sidebar = () => {
         </div>
       </div>
 
-      {/* Navigation List */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {navItems.map((item) => {
           const Icon = item.icon;

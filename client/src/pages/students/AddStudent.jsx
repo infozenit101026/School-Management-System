@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { 
   UserPlus, 
@@ -9,35 +9,94 @@ import {
   Loader2,
   AlertCircle
 } from 'lucide-react';
+import { academicService } from '../../services/academicService';
+import { studentService } from '../../services/studentService';
 
 const AddStudent = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState({ type: '', message: '' });
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm();
+  // Academic Dropdown States
+  const [academicYears, setAcademicYears] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
+
+  const { register, handleSubmit, watch, setValue, formState: { errors }, reset } = useForm();
+
+  const selectedYear = watch('academicYear');
+  const selectedClass = watch('class');
+
+  // 1. Load Academic Years on mount
+  useEffect(() => {
+    academicService.getAcademicYears()
+      .then(res => setAcademicYears(res.data || []))
+      .catch(err => console.error('Failed to fetch academic years', err));
+  }, []);
+
+  // 2. Fetch Classes when Academic Year is selected
+  useEffect(() => {
+    if (selectedYear) {
+      academicService.getClassesByYear(selectedYear)
+        .then(res => setClasses(res.data || []))
+        .catch(err => console.error(err));
+      setValue('class', '');
+      setValue('section', '');
+      setSections([]);
+    }
+  }, [selectedYear, setValue]);
+
+  // 3. Fetch Sections when Class is selected
+  useEffect(() => {
+    if (selectedClass) {
+      academicService.getSectionsByClass(selectedClass)
+        .then(res => setSections(res.data || []))
+        .catch(err => console.error(err));
+      setValue('section', '');
+    }
+  }, [selectedClass, setValue]);
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     setSubmitStatus({ type: '', message: '' });
 
+    // Payload structured to match processStudentAdmission service requirements
+    const payload = {
+      studentDetails: {
+        fullName: `${data.firstName} ${data.lastName}`.trim(),
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender, // Enum: MALE, FEMALE, OTHER
+        bloodGroup: data.bloodGroup || undefined,
+        contactNumber: data.guardianPhone,
+        address: data.address
+      },
+      guardianDetails: [
+        {
+          fullName: data.guardianName,
+          relationship: data.guardianRelation.toUpperCase(),
+          phone: data.guardianPhone,
+          email: data.guardianEmail || undefined,
+          isPrimary: true
+        }
+      ],
+      enrollmentDetails: {
+        academicYear: data.academicYear,
+        class: data.class,
+        section: data.section
+      }
+    };
+
     try {
-      // In a real scenario, this would be an API call via your studentService
-      // await api.post('/students/admissions', data);
-      
-      console.log('Admission Data Payload:', data);
-      
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
+      const res = await studentService.registerAdmission(payload);
       setSubmitStatus({ 
         type: 'success', 
-        message: 'Student admitted successfully! Admission Number: ADM-26001' 
+        message: `Student admitted successfully! Admission Number: ${res.data?.admissionNumber || 'Assigned'}` 
       });
-      reset(); // Clear the form
+      reset();
     } catch (error) {
+      const errorMsg = error.response?.data?.message || 'Failed to process admission. Please try again.';
       setSubmitStatus({ 
         type: 'error', 
-        message: 'Failed to process admission. Please try again.' 
+        message: errorMsg 
       });
     } finally {
       setIsSubmitting(false);
@@ -121,9 +180,9 @@ const AddStudent = () => {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none bg-white"
               >
                 <option value="">Select Gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+                <option value="OTHER">Other</option>
               </select>
               {errors.gender && <p className="text-red-500 text-xs mt-1">{errors.gender.message}</p>}
             </div>
@@ -144,16 +203,6 @@ const AddStudent = () => {
                 <option value="AB+">AB+</option>
                 <option value="AB-">AB-</option>
               </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Nationality</label>
-              <input
-                type="text"
-                {...register('nationality')}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
-                defaultValue="Indian"
-              />
             </div>
           </div>
         </div>
@@ -185,7 +234,7 @@ const AddStudent = () => {
                 <option value="">Select Relationship</option>
                 <option value="Father">Father</option>
                 <option value="Mother">Mother</option>
-                <option value="Other">Other</option>
+                <option value="Guardian">Guardian</option>
               </select>
               {errors.guardianRelation && <p className="text-red-500 text-xs mt-1">{errors.guardianRelation.message}</p>}
             </div>
@@ -239,8 +288,9 @@ const AddStudent = () => {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none bg-white"
               >
                 <option value="">Select Year</option>
-                <option value="2026-2027">2026-2027</option>
-                <option value="2027-2028">2027-2028</option>
+                {academicYears.map(y => (
+                  <option key={y._id} value={y._id}>{y.year}</option>
+                ))}
               </select>
               {errors.academicYear && <p className="text-red-500 text-xs mt-1">{errors.academicYear.message}</p>}
             </div>
@@ -249,12 +299,13 @@ const AddStudent = () => {
               <label className="block text-sm font-medium text-slate-700 mb-1">Admitting Class *</label>
               <select
                 {...register('class', { required: 'Class is required' })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none bg-white"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none bg-white disabled:bg-slate-100"
+                disabled={!selectedYear}
               >
                 <option value="">Select Class</option>
-                <option value="Class 8">Class 8</option>
-                <option value="Class 9">Class 9</option>
-                <option value="Class 10">Class 10</option>
+                {classes.map(c => (
+                  <option key={c._id} value={c._id}>{c.name}</option>
+                ))}
               </select>
               {errors.class && <p className="text-red-500 text-xs mt-1">{errors.class.message}</p>}
             </div>
@@ -263,12 +314,13 @@ const AddStudent = () => {
               <label className="block text-sm font-medium text-slate-700 mb-1">Section *</label>
               <select
                 {...register('section', { required: 'Section is required' })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none bg-white"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 outline-none bg-white disabled:bg-slate-100"
+                disabled={!selectedClass}
               >
                 <option value="">Select Section</option>
-                <option value="A">A</option>
-                <option value="B">B</option>
-                <option value="C">C</option>
+                {sections.map(s => (
+                  <option key={s._id} value={s._id}>{s.name}</option>
+                ))}
               </select>
               {errors.section && <p className="text-red-500 text-xs mt-1">{errors.section.message}</p>}
             </div>

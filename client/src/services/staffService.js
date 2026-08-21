@@ -29,5 +29,16 @@ export const staffService = {
   deleteStaff: async (id) => {
     const response = await api.delete(`/staff/${id}`);
     return response.data;
+  },
+
+  assignTeacherToSubject: async (assignmentData) => {
+    const response = await api.post('/staff/assign-subject', assignmentData);
+    return response.data;
+  },
+
+  // Get subject assignments for a specific section
+  getSectionAssignments: async (sectionId, academicYearId) => {
+    const response = await api.get(`/staff/assignments/section/${sectionId}/${academicYearId}`);
+    return response.data;
   }
 };

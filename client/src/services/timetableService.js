@@ -13,5 +13,10 @@ export const timetableService = {
       params: { academicYearId }
     });
     return response.data;
+  },
+
+  setDayTimetable: async (timetableData) => {
+    const response = await api.post('/timetable', timetableData);
+    return response.data;
   }
 };

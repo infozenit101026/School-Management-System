@@ -9,8 +9,8 @@ import {
   getSectionsByClass,
   createSubject,
   getSubjects,
+  assignClassTeacher
 } from "../controllers/academicController.js";
-import { assignClassTeacher } from "../controllers/classTeacherController.js";
 
 const router = express.Router();
 
@@ -42,7 +42,7 @@ router
   .post(authorize("ADMIN", "SCHOOL_MANAGER"), createSubject);
 
 router
-  .route("/class-teachers")
+  .route("/class-teacher")
   .post(authorize("ADMIN", "SCHOOL_MANAGER"), assignClassTeacher);
 
 export default router;

@@ -44,6 +44,12 @@ router.post(
   assignTeacherToSubject
 );
 
+router.post(
+  "/assign-subject",
+  authorize("ADMIN", "SCHOOL_MANAGER"),
+  assignTeacherToSubject
+);
+
 router.get('/assignments/:academicYearId/:sectionId', getSectionAssignments);
 
 export default router;

@@ -1,217 +1,301 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { timetableService } from '../../services/timetableService';
 import { academicService } from '../../services/academicService';
+import { staffService } from '../../services/staffService';
+import { timetableService } from '../../services/timetableService';
+import { Clock, Plus, Trash2, Save, AlertCircle, CheckCircle, Calendar } from 'lucide-react';
 
-const Timetable = ({ isStaffView = false }) => {
-  const { user } = useAuth(); // Needed to fetch staff schedule by their ID
-  const [schedule, setSchedule] = useState([]);
-  
-  // Dropdown Data States
+const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+
+const Timetable = () => {
   const [academicYears, setAcademicYears] = useState([]);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [staffList, setStaffList] = useState([]);
 
-  // Filter States
-  const [filters, setFilters] = useState({ academicYear: '', classId: '', sectionId: '' });
+  // Selection state
+  const [selectedYear, setSelectedYear] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
+  const [selectedDay, setSelectedDay] = useState('MONDAY');
+
+  // Timetable Periods State
+  const [periods, setPeriods] = useState([]);
+  const [weeklySchedule, setWeeklySchedule] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [status, setStatus] = useState({ type: '', message: '' });
 
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const periods = ['P1', 'P2', 'P3', 'P4', 'Break', 'P5', 'P6', 'P7'];
-
-  // 1. Fetch Academic Years on Mount (For both Staff and Admin views)
   useEffect(() => {
-    const fetchYears = async () => {
-      try {
-        const res = await academicService.getAcademicYears();
-        setAcademicYears(res.data || []);
-        
-        // Auto-select the first active year for staff view
-        if (isStaffView && res.data?.length > 0) {
-          const activeYear = res.data.find(y => y.isActive) || res.data[0];
-          setFilters(prev => ({ ...prev, academicYear: activeYear._id }));
-        }
-      } catch (error) {
-        console.error("Failed to load academic years", error);
-      }
-    };
-    fetchYears();
-  }, [isStaffView]);
+    academicService.getAcademicYears().then(res => setAcademicYears(res.data || []));
+    academicService.getSubjects().then(res => setSubjects(res.data || []));
+    staffService.getAllStaff().then(res => setStaffList(res.data || []));
+  }, []);
 
-  // 2. Fetch Classes when Academic Year changes (Admin View Only)
   useEffect(() => {
-    if (!isStaffView && filters.academicYear) {
-      academicService.getClassesByYear(filters.academicYear)
-        .then(res => setClasses(res.data || []))
-        .catch(err => console.error(err));
-      setFilters(prev => ({ ...prev, classId: '', sectionId: '' }));
+    if (selectedYear) {
+      academicService.getClassesByYear(selectedYear).then(res => setClasses(res.data || []));
+      setSelectedClass('');
+      setSelectedSection('');
       setSections([]);
     }
-  }, [filters.academicYear, isStaffView]);
+  }, [selectedYear]);
 
-  // 3. Fetch Sections when Class changes (Admin View Only)
   useEffect(() => {
-    if (!isStaffView && filters.classId) {
-      academicService.getSectionsByClass(filters.classId)
-        .then(res => setSections(res.data || []))
-        .catch(err => console.error(err));
-      setFilters(prev => ({ ...prev, sectionId: '' }));
+    if (selectedClass) {
+      academicService.getSectionsByClass(selectedClass).then(res => setSections(res.data || []));
+      setSelectedSection('');
     }
-  }, [filters.classId, isStaffView]);
+  }, [selectedClass]);
 
-  // 4. Fetch the Timetable
-  const fetchTimetable = async (e) => {
-    e?.preventDefault();
+  useEffect(() => {
+    if (selectedClass && selectedSection) {
+      loadClassTimetable();
+    }
+  }, [selectedClass, selectedSection]);
+
+  useEffect(() => {
+    const dayData = weeklySchedule.find(s => s.day === selectedDay);
+    if (dayData && dayData.periods) {
+      setPeriods(dayData.periods.map(p => ({
+        periodNumber: p.periodNumber,
+        subject: p.subject?._id || p.subject,
+        teacher: p.teacher?._id || p.teacher,
+        startTime: p.startTime,
+        endTime: p.endTime
+      })));
+    } else {
+      setPeriods([]);
+    }
+  }, [selectedDay, weeklySchedule]);
+
+  const loadClassTimetable = async () => {
+    try {
+      const res = await timetableService.getClassTimetable(selectedClass, selectedSection);
+      setWeeklySchedule(res.data || []);
+    } catch (err) {
+      console.error('Failed to load timetable', err);
+    }
+  };
+
+  const handleAddPeriod = () => {
+    const nextNum = periods.length + 1;
+    setPeriods([
+      ...periods,
+      { periodNumber: nextNum, subject: '', teacher: '', startTime: '09:00 AM', endTime: '09:45 AM' }
+    ]);
+  };
+
+  const handleRemovePeriod = (index) => {
+    const updated = periods.filter((_, i) => i !== index).map((p, i) => ({ ...p, periodNumber: i + 1 }));
+    setPeriods(updated);
+  };
+
+  const handlePeriodChange = (index, field, value) => {
+    const updated = [...periods];
+    updated[index][field] = value;
+    setPeriods(updated);
+  };
+
+  const handleSaveDaySchedule = async () => {
+    if (!selectedYear || !selectedClass || !selectedSection) {
+      setStatus({ type: 'error', message: 'Please select Academic Year, Class, and Section.' });
+      return;
+    }
+
     setLoading(true);
-    setMessage({ type: '', text: '' });
+    setStatus({ type: '', message: '' });
+
+    const payload = {
+      academicYear: selectedYear,
+      classId: selectedClass,
+      sectionId: selectedSection,
+      day: selectedDay,
+      periods
+    };
 
     try {
-      let res;
-      if (isStaffView) {
-        // Fetch teacher's specific schedule using getTeacherSchedule
-        res = await timetableService.getTeacherSchedule(user._id, filters.academicYear);
-      } else {
-        // Fetch full class schedule using getClassTimetable[cite: 36]
-        res = await timetableService.getClassTimetable(filters.classId, filters.sectionId);
-      }
-
-      // Format backend response (Array of days with periods) into a flat array for the UI grid[cite: 43]
-      const formattedSchedule = [];
-      if (res.data) {
-        res.data.forEach(dayRecord => {
-          dayRecord.periods.forEach(p => {
-            formattedSchedule.push({
-              day: dayRecord.day,
-              period: `P${p.periodNumber || p.period}`, // Ensure your DB periods map to 1, 2, 3, etc.
-              subject: p.subject?.name || 'N/A',
-              teacher: p.teacher?.fullName || 'N/A',
-              className: isStaffView && dayRecord.class ? `${dayRecord.class.name} - ${dayRecord.section?.name}` : null
-            });
-          });
-        });
-      }
-      setSchedule(formattedSchedule);
-      if (formattedSchedule.length === 0) setMessage({ type: 'info', text: 'No schedule found.' });
-      
-    } catch (error) {
-      console.error(error);
-      setMessage({ type: 'error', text: 'Failed to fetch timetable.' });
+      await timetableService.setDayTimetable(payload);
+      setStatus({ type: 'success', message: `Schedule for ${selectedDay} saved successfully!` });
+      loadClassTimetable();
+    } catch (err) {
+      const errMsg = err.response?.data?.message || 'Failed to save timetable';
+      setStatus({ type: 'error', message: errMsg });
     } finally {
       setLoading(false);
     }
   };
 
-  // Auto-fetch Staff timetable when academic year is set
-  useEffect(() => {
-    if (isStaffView && filters.academicYear && user?._id) {
-      fetchTimetable();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isStaffView, filters.academicYear, user]);
-
   return (
-    <div className="p-6 bg-slate-50 min-h-screen">
-      <h1 className="text-2xl font-bold mb-6 text-slate-800">
-        {isStaffView ? 'My Timetable' : 'Class Timetable'}
-      </h1>
+    <div className="max-w-6xl mx-auto space-y-6">
+      <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+            <Clock className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">Timetable Scheduler</h1>
+            <p className="text-sm text-slate-500">Configure weekly class schedules and teacher allocations</p>
+          </div>
+        </div>
+      </div>
 
-      {/* Admin/Manager Filter - Hidden for Staff[cite: 43] */}
-      {!isStaffView && (
-        <form onSubmit={fetchTimetable} className="bg-white p-4 rounded-lg shadow-sm mb-6 border flex flex-wrap gap-4 items-end">
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Academic Year</label>
-            <select 
-              className="mt-1 block w-40 border-slate-300 rounded-md shadow-sm"
-              value={filters.academicYear}
-              onChange={(e) => setFilters({...filters, academicYear: e.target.value})}
-              required
-            >
-              <option value="">Select Year</option>
-              {academicYears.map(year => (
-                <option key={year._id} value={year._id}>{year.year}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Class</label>
-            <select 
-              className="mt-1 block w-32 border-slate-300 rounded-md shadow-sm disabled:bg-slate-100"
-              value={filters.classId}
-              onChange={(e) => setFilters({...filters, classId: e.target.value})}
-              required
-              disabled={!filters.academicYear}
-            >
-              <option value="">Select Class</option>
-              {classes.map(cls => (
-                <option key={cls._id} value={cls._id}>{cls.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Section</label>
-            <select 
-              className="mt-1 block w-32 border-slate-300 rounded-md shadow-sm disabled:bg-slate-100"
-              value={filters.sectionId}
-              onChange={(e) => setFilters({...filters, sectionId: e.target.value})}
-              required
-              disabled={!filters.classId}
-            >
-              <option value="">Select Section</option>
-              {sections.map(sec => (
-                <option key={sec._id} value={sec._id}>{sec.name}</option>
-              ))}
-            </select>
-          </div>
-          <button type="submit" disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-blue-400">
-            {loading ? 'Loading...' : 'View Schedule'}
-          </button>
-        </form>
-      )}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Academic Year</label>
+          <select
+            value={selectedYear}
+            onChange={e => setSelectedYear(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 bg-white"
+          >
+            <option value="">Select Year</option>
+            {academicYears.map(y => <option key={y._id} value={y._id}>{y.year}</option>)}
+          </select>
+        </div>
 
-      {message.text && (
-        <div className={`p-4 mb-6 rounded-md ${message.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
-          {message.text}
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Class</label>
+          <select
+            disabled={!selectedYear}
+            value={selectedClass}
+            onChange={e => setSelectedClass(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 bg-white disabled:bg-slate-100"
+          >
+            <option value="">Select Class</option>
+            {classes.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Section</label>
+          <select
+            disabled={!selectedClass}
+            value={selectedSection}
+            onChange={e => setSelectedSection(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 bg-white disabled:bg-slate-100"
+          >
+            <option value="">Select Section</option>
+            {sections.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {status.message && (
+        <div className={`p-4 rounded-lg flex items-center gap-3 border ${
+          status.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-800 border-red-200'
+        }`}>
+          {status.type === 'success' ? <CheckCircle className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
+          <p className="font-medium text-sm">{status.message}</p>
         </div>
       )}
 
-      {/* Timetable Grid[cite: 43] */}
-      {schedule.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 text-center">
-            <thead className="bg-slate-100">
-              <tr>
-                <th className="px-4 py-3 text-sm font-medium text-slate-600 border-r w-32">Day / Period</th>
-                {periods.map(p => (
-                  <th key={p} className="px-4 py-3 text-sm font-medium text-slate-600 border-r min-w-[120px]">{p}</th>
+      {selectedSection && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="flex border-b border-slate-200 bg-slate-50 overflow-x-auto">
+            {DAYS.map(day => (
+              <button
+                key={day}
+                onClick={() => setSelectedDay(day)}
+                className={`px-6 py-3.5 text-xs font-bold tracking-wider transition-colors border-b-2 whitespace-nowrap ${
+                  selectedDay === day
+                    ? 'border-blue-600 bg-white text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-bold text-slate-800 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-600" /> Schedule for {selectedDay}
+              </h2>
+              <button
+                onClick={handleAddPeriod}
+                className="px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Add Period Slot
+              </button>
+            </div>
+
+            {periods.length === 0 ? (
+              <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-xl">
+                <p className="text-sm text-slate-500">No periods scheduled for {selectedDay}. Click "Add Period Slot" to begin.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {periods.map((p, index) => (
+                  <div key={index} className="grid grid-cols-12 gap-3 items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div className="col-span-1 text-center font-bold text-slate-600 text-sm">
+                      #{p.periodNumber}
+                    </div>
+
+                    <div className="col-span-3">
+                      <select
+                        value={p.subject}
+                        onChange={e => handlePeriodChange(index, 'subject', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-600"
+                      >
+                        <option value="">Select Subject</option>
+                        {subjects.map(s => <option key={s._id} value={s._id}>{s.name} ({s.code})</option>)}
+                      </select>
+                    </div>
+
+                    <div className="col-span-3">
+                      <select
+                        value={p.teacher}
+                        onChange={e => handlePeriodChange(index, 'teacher', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-600"
+                      >
+                        <option value="">Select Teacher</option>
+                        {staffList.map(st => <option key={st._id} value={st._id}>{st.fullName} ({st.employeeId})</option>)}
+                      </select>
+                    </div>
+
+                    <div className="col-span-2">
+                      <input
+                        type="text"
+                        placeholder="09:00 AM"
+                        value={p.startTime}
+                        onChange={e => handlePeriodChange(index, 'startTime', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-600"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <input
+                        type="text"
+                        placeholder="09:45 AM"
+                        value={p.endTime}
+                        onChange={e => handlePeriodChange(index, 'endTime', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white outline-none focus:ring-1 focus:ring-blue-600"
+                      />
+                    </div>
+
+                    <div className="col-span-1 text-right">
+                      <button
+                        onClick={() => handleRemovePeriod(index)}
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {days.map(day => (
-                <tr key={day}>
-                  <td className="px-4 py-4 text-sm font-bold text-slate-800 bg-slate-50 border-r">{day}</td>
-                  {periods.map(period => {
-                    if (period === 'Break') return <td key={`${day}-${period}`} className="bg-slate-100 border-r text-slate-400 text-xs tracking-widest font-bold">BREAK</td>;
-                    
-                    const slot = schedule.find(s => s.day === day && s.period === period);
-                    return (
-                      <td key={`${day}-${period}`} className="px-2 py-3 border-r">
-                        {slot ? (
-                          <div className="flex flex-col items-center justify-center text-center">
-                            <span className="font-semibold text-blue-700 text-sm leading-tight">{slot.subject}</span>
-                            <span className="text-xs text-slate-500 mt-1">{isStaffView ? slot.className : slot.teacher}</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-300">-</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-4 border-t border-slate-100">
+              <button
+                onClick={handleSaveDaySchedule}
+                disabled={loading || periods.length === 0}
+                className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl flex items-center gap-2 hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" /> {loading ? 'Saving...' : `Save ${selectedDay} Timetable`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
