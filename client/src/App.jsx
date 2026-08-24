@@ -22,7 +22,7 @@ import Timetable from "./pages/academics/Timetable";
 import MarksEntry from './pages/examinations/MarksEntry';
 import AcademicsManagement from "./pages/academics/AcademicsManagement";
 import TeacherAssignments from "./pages/academics/TeacherAssignments";
-
+import EditStudent from './pages/students/EditStudent';
 // Fallback / Dummy Pages
 const NotFound = () => (
   <div className="text-2xl text-red-500 p-8">404 - Page Not Found</div>
@@ -46,7 +46,7 @@ function App() {
               <Route path="/students" element={<StudentList />} />
               <Route path="/students/add" element={<AddStudent />} />
               <Route path="/students/:id" element={<StudentProfile />} />
-              
+              <Route path="/students/:id/edit" element={<EditStudent />} />
               {/* Academics & Allocations Routes */}
               <Route path="/academics" element={<AcademicsManagement />} />
               <Route path="/academics/teacher-assignments" element={<TeacherAssignments />} />

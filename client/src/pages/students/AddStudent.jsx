@@ -7,7 +7,8 @@ import {
   BookOpen, 
   Save, 
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Info
 } from 'lucide-react';
 import { academicService } from '../../services/academicService';
 import { studentService } from '../../services/studentService';
@@ -64,18 +65,18 @@ const AddStudent = () => {
       studentDetails: {
         fullName: `${data.firstName} ${data.lastName}`.trim(),
         dateOfBirth: data.dateOfBirth,
-        gender: data.gender, // Enum: MALE, FEMALE, OTHER
+        gender: data.gender, 
         bloodGroup: data.bloodGroup || undefined,
-        contactNumber: data.guardianPhone,
+        contactNumber: data.guardianPhone, // Reusing guardian phone for student if not explicitly collected
         address: data.address
       },
       guardianDetails: [
         {
           fullName: data.guardianName,
-          relationship: data.guardianRelation.toUpperCase(),
-          phone: data.guardianPhone,
+          relationType: data.guardianRelation.toUpperCase(), // FIX: matches backend schema
+          contactNumber: data.guardianPhone,                 // FIX: matches backend schema
           email: data.guardianEmail || undefined,
-          isPrimary: true
+          isEmergencyContact: true                           // FIX: matches backend schema
         }
       ],
       enrollmentDetails: {
@@ -89,7 +90,7 @@ const AddStudent = () => {
       const res = await studentService.registerAdmission(payload);
       setSubmitStatus({ 
         type: 'success', 
-        message: `Student admitted successfully! Admission Number: ${res.data?.admissionNumber || 'Assigned'}` 
+        message: `Student admitted successfully! Admission Number: ${res.data?.data?.admissionNumber || 'Assigned'}` 
       });
       reset();
     } catch (error) {
@@ -275,9 +276,11 @@ const AddStudent = () => {
 
         {/* Section 3: Academic Enrollment */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <BookOpen className="w-5 h-5 text-slate-400" />
-            <h2 className="text-lg font-bold text-slate-800">Academic Enrollment</h2>
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-slate-400" />
+              <h2 className="text-lg font-bold text-slate-800">Academic Enrollment</h2>
+            </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -323,6 +326,14 @@ const AddStudent = () => {
                 ))}
               </select>
               {errors.section && <p className="text-red-500 text-xs mt-1">{errors.section.message}</p>}
+            </div>
+
+            {/* Automation Warning Banner */}
+            <div className="md:col-span-3 bg-blue-50 text-blue-800 p-4 rounded-lg flex items-start gap-3 border border-blue-200">
+              <Info className="w-5 h-5 shrink-0 mt-0.5" />
+              <p className="text-sm">
+                <strong>Automation Notice:</strong> Admission Numbers and Student IDs are automatically generated sequentially. The student's <strong>Roll Number</strong> will be calculated automatically by inserting them into the existing section list in alphabetical order.
+              </p>
             </div>
           </div>
         </div>

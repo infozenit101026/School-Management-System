@@ -3,7 +3,10 @@ import { protect, authorize } from "../middleware/authMiddleware.js";
 import {
   registerAdmission,
   getEnrolledStudents,
-  promoteStudents
+  promoteStudents,
+  getStudentById,
+  updateStudent,
+  deleteStudent
 } from "../controllers/studentController.js";
 
 const router = express.Router();
@@ -23,5 +26,11 @@ router.post(
   authorize("ADMIN", "SCHOOL_MANAGER", "STUDENT_MANAGER"),
   promoteStudents,
 );
+
+router
+  .route("/:id")
+  .get(getStudentById)
+  .put(authorize("ADMIN", "SCHOOL_MANAGER", "STUDENT_MANAGER"), updateStudent)
+  .delete(authorize("ADMIN", "SCHOOL_MANAGER", "STUDENT_MANAGER"), deleteStudent);
 
 export default router;
